@@ -2,11 +2,13 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 const USERS_TABLE = process.env.USERS_TABLE_NAME!;
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log('Event:', JSON.stringify(event, null, 2));
@@ -19,6 +21,10 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         return await handleRegister(event);
       case 'POST /auth/login':
         return await handleLogin(event);
+      case 'GET /auth/profile':
+        return await handleProfile(event);
+      case 'POST /auth/refresh':
+        return await handleRefresh(event);
       default:
         return {
           statusCode: 404,
@@ -35,6 +41,38 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     };
   }
 };
+
+function generateTokens(userId: string, email: string) {
+  const accessToken = jwt.sign(
+    { userId, email, type: 'access' },
+    JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+  
+  const refreshToken = jwt.sign(
+    { userId, email, type: 'refresh' },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  
+  return { accessToken, refreshToken };
+}
+
+function verifyToken(token: string): any {
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch (error) {
+    return null;
+  }
+}
+
+function getAuthToken(event: APIGatewayProxyEvent): string | null {
+  const authHeader = event.headers.Authorization || event.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  return authHeader.substring(7);
+}
 
 async function handleRegister(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
   const body = JSON.parse(event.body || '{}');
@@ -81,12 +119,15 @@ async function handleRegister(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     }
   }));
 
+  const tokens = generateTokens(userId, email);
+
   return {
     statusCode: 201,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       message: 'User created successfully',
-      data: { userId, email, name }
+      data: { userId, email, name },
+      tokens
     })
   };
 }
@@ -130,12 +171,77 @@ async function handleLogin(event: APIGatewayProxyEvent): Promise<APIGatewayProxy
     };
   }
 
+  const tokens = generateTokens(user.userId, user.email);
+
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       message: 'Login successful',
-      data: { userId: user.userId, email: user.email, name: user.name }
+      data: { userId: user.userId, email: user.email, name: user.name },
+      tokens
+    })
+  };
+}
+
+async function handleProfile(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const token = getAuthToken(event);
+  if (!token) {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'Authorization token required' })
+    };
+  }
+
+  const decoded = verifyToken(token);
+  if (!decoded || decoded.type !== 'access') {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'Invalid or expired token' })
+    };
+  }
+
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: 'Profile retrieved successfully',
+      data: { userId: decoded.userId, email: decoded.email }
+    })
+  };
+}
+
+async function handleRefresh(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const body = JSON.parse(event.body || '{}');
+  const { refreshToken } = body;
+
+  if (!refreshToken) {
+    return {
+      statusCode: 400,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'Refresh token required' })
+    };
+  }
+
+  const decoded = verifyToken(refreshToken);
+  if (!decoded || decoded.type !== 'refresh') {
+    return {
+      statusCode: 401,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'Invalid refresh token' })
+    };
+  }
+
+  const tokens = generateTokens(decoded.userId, decoded.email);
+
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: 'Tokens refreshed successfully',
+      tokens
     })
   };
 }

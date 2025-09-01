@@ -35,6 +35,7 @@ export class CdkTutorialStack extends cdk.Stack {
       runtime: lambda.Runtime.NODEJS_18_X,
       environment: {
         USERS_TABLE_NAME: usersTable.tableName,
+        JWT_SECRET: 'your-super-secret-jwt-key-change-in-production',
       },
     });
 
@@ -48,6 +49,7 @@ export class CdkTutorialStack extends cdk.Stack {
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
         allowMethods: apigateway.Cors.ALL_METHODS,
+        allowHeaders: ['Content-Type', 'Authorization'],
       },
     });
 
@@ -58,6 +60,8 @@ export class CdkTutorialStack extends cdk.Stack {
     const authResource = api.root.addResource('auth');
     authResource.addResource('register').addMethod('POST', authIntegration);
     authResource.addResource('login').addMethod('POST', authIntegration);
+    authResource.addResource('profile').addMethod('GET', authIntegration);
+    authResource.addResource('refresh').addMethod('POST', authIntegration);
 
     // Output the API URL
     new cdk.CfnOutput(this, 'ApiUrl', {
