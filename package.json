@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "22.7.9",
     "@types/uuid": "^10.0.0",
     "aws-cdk": "2.1027.0",
@@ -28,6 +29,7 @@
     "aws-cdk-lib": "2.211.0",
     "bcryptjs": "^3.0.2",
     "constructs": "^10.0.0",
+    "jsonwebtoken": "^9.0.2",
     "uuid": "^11.1.0"
   }
 }

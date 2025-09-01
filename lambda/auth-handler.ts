@@ -10,6 +10,13 @@ const docClient = DynamoDBDocumentClient.from(client);
 const USERS_TABLE = process.env.USERS_TABLE_NAME!;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+const corsHeaders = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS'
+};
+
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   console.log('Event:', JSON.stringify(event, null, 2));
   
@@ -28,7 +35,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
       default:
         return {
           statusCode: 404,
-          headers: { 'Content-Type': 'application/json' },
+          headers: corsHeaders,
           body: JSON.stringify({ message: 'Not Found' })
         };
     }
@@ -36,7 +43,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     console.error('Error:', error);
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Internal Server Error' })
     };
   }
@@ -81,7 +88,7 @@ async function handleRegister(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   if (!email || !password) {
     return {
       statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Email and password are required' })
     };
   }
@@ -97,7 +104,7 @@ async function handleRegister(event: APIGatewayProxyEvent): Promise<APIGatewayPr
   if (existingUser.Items && existingUser.Items.length > 0) {
     return {
       statusCode: 409,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'User already exists' })
     };
   }
@@ -123,7 +130,7 @@ async function handleRegister(event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
   return {
     statusCode: 201,
-    headers: { 'Content-Type': 'application/json' },
+    headers: corsHeaders,
     body: JSON.stringify({
       message: 'User created successfully',
       data: { userId, email, name },
@@ -139,7 +146,7 @@ async function handleLogin(event: APIGatewayProxyEvent): Promise<APIGatewayProxy
   if (!email || !password) {
     return {
       statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Email and password are required' })
     };
   }
@@ -155,7 +162,7 @@ async function handleLogin(event: APIGatewayProxyEvent): Promise<APIGatewayProxy
   if (!result.Items || result.Items.length === 0) {
     return {
       statusCode: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Invalid credentials' })
     };
   }
@@ -166,7 +173,7 @@ async function handleLogin(event: APIGatewayProxyEvent): Promise<APIGatewayProxy
   if (!isValidPassword) {
     return {
       statusCode: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Invalid credentials' })
     };
   }
@@ -175,7 +182,7 @@ async function handleLogin(event: APIGatewayProxyEvent): Promise<APIGatewayProxy
 
   return {
     statusCode: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: corsHeaders,
     body: JSON.stringify({
       message: 'Login successful',
       data: { userId: user.userId, email: user.email, name: user.name },
@@ -189,7 +196,7 @@ async function handleProfile(event: APIGatewayProxyEvent): Promise<APIGatewayPro
   if (!token) {
     return {
       statusCode: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Authorization token required' })
     };
   }
@@ -198,14 +205,14 @@ async function handleProfile(event: APIGatewayProxyEvent): Promise<APIGatewayPro
   if (!decoded || decoded.type !== 'access') {
     return {
       statusCode: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Invalid or expired token' })
     };
   }
 
   return {
     statusCode: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: corsHeaders,
     body: JSON.stringify({
       message: 'Profile retrieved successfully',
       data: { userId: decoded.userId, email: decoded.email }
@@ -220,7 +227,7 @@ async function handleRefresh(event: APIGatewayProxyEvent): Promise<APIGatewayPro
   if (!refreshToken) {
     return {
       statusCode: 400,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Refresh token required' })
     };
   }
@@ -229,7 +236,7 @@ async function handleRefresh(event: APIGatewayProxyEvent): Promise<APIGatewayPro
   if (!decoded || decoded.type !== 'refresh') {
     return {
       statusCode: 401,
-      headers: { 'Content-Type': 'application/json' },
+      headers: corsHeaders,
       body: JSON.stringify({ message: 'Invalid refresh token' })
     };
   }
@@ -238,7 +245,7 @@ async function handleRefresh(event: APIGatewayProxyEvent): Promise<APIGatewayPro
 
   return {
     statusCode: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: corsHeaders,
     body: JSON.stringify({
       message: 'Tokens refreshed successfully',
       tokens
